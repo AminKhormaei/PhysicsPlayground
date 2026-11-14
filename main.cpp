@@ -7,10 +7,12 @@ __declspec(dllimport) long __stdcall DwmSetWindowAttribute(
 #endif
 
 #include "raylib.h"
-#include "coordinate.h"
+#include "Coordinate.h"
+#include "Arrow.h"
 
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
+
 
 #include <cstdlib>
 #include <cstring>
@@ -129,6 +131,10 @@ int main(int argc, char* argv[])
     Vector2 startMouse = { 0 };    // mouse position in SCREEN space when resize started
     Vector2 startPos = { 0 };      // window position when resize started
     Vector2 startSize = { 0 };     // window size when resize started
+    
+    // Arrow stuff
+    Vector2 start = { 0 };
+    bool arrowDragging = false;
 
     // Main game loop
     while (!WindowShouldClose() && !closeRequested)
@@ -137,7 +143,31 @@ int main(int argc, char* argv[])
         Vector2 mouse = GetMousePosition();   // relative to the window
         float screenW = (float)GetScreenWidth();
         float screenH = (float)GetScreenHeight();
+        
+        
+        // Define UI rectangles once per frame (the grid slider depends on window size)
+        Rectangle unitSlider    = { 80, 40, 120, 8 };
+        Rectangle gravitySlider = { 80, 65, 120, 8 };
+        Rectangle gridSlider    = { screenW - 180.0f, screenH - 30.0f, 120.0f, 8.0f };
+        
+        // Returns true if point p is on top of any UI element
+        auto OverUI = [&](Vector2 p)
+        {
+            // Inflate a rect so the label, the value text and the thin 8px bar are all easy to hit
+            auto hit = [&](Rectangle r)
+            {
+                r.x -= 70; r.width  += 140;
+                r.y -= 8;  r.height += 16;
+                return CheckCollisionPointRec(p, r);
+            };
 
+            return p.y <= dragBarHeight // title bar (drag area + buttons)
+                || hit(unitSlider)
+                || hit(gravitySlider)
+                || hit(gridSlider);
+        };
+
+        
         // Mouse wheel zoom for pixelsPerUnit
         float wheel = GetMouseWheelMove();
         if (wheel != 0.0f)
@@ -232,18 +262,34 @@ int main(int argc, char* argv[])
             SetWindowPosition((int)(win.x + mouse.x - grab.x),
                               (int)(win.y + mouse.y - grab.y));
         }
+        
+        // Mouse pressed: remember where the arrow starts
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)
+                    && hover == 0
+                    && !dragging
+                    && !OverUI(mouse))
+        {
+            start = mouse;
+            arrowDragging = true;
+        }
 
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
+        {
+            arrowDragging = false;
+        }
+        
+        
         // Coordinate calculations
-        Vector2 origin = coordinate::origin(screenW, screenH);
-        Vector2 left = coordinate::middle_edge(screenW, screenH, coordinate::positions::left);
-        Vector2 right = coordinate::middle_edge(screenW, screenH, coordinate::positions::right);
-        Vector2 top = coordinate::middle_edge(screenW, screenH, coordinate::positions::top);
-        Vector2 bottom = coordinate::middle_edge(screenW, screenH, coordinate::positions::bottom);
+        Vector2 origin = Coordinate::origin(screenW, screenH);
+        Vector2 left = Coordinate::middle_edge(screenW, screenH, Coordinate::positions::left);
+        Vector2 right = Coordinate::middle_edge(screenW, screenH, Coordinate::positions::right);
+        Vector2 top = Coordinate::middle_edge(screenW, screenH, Coordinate::positions::top);
+        Vector2 bottom = Coordinate::middle_edge(screenW, screenH, Coordinate::positions::bottom);
 
         float step = pixelsPerUnit;
 
         BeginDrawing();
-
+        
         ClearBackground(color);
 
         // --- 1. Background Grid Lines (Subtle Cartesian Grid) ---
@@ -276,7 +322,7 @@ int main(int argc, char* argv[])
             DrawLineV({ x, origin.y - 5.0f }, { x, origin.y + 5.0f }, LIGHTGRAY);
 
             if (i % labelEvery == 0)
-                coordinate::DrawTickLabel(myFont, i, { x, origin.y + 8.0f }, 16.0f, LIGHTGRAY);
+                Coordinate::DrawTickLabel(myFont, i, { x, origin.y + 8.0f }, 16.0f, LIGHTGRAY);
         }
 
         // Negative X Ticks & Labels
@@ -286,7 +332,7 @@ int main(int argc, char* argv[])
             DrawLineV({ x, origin.y - 5.0f }, { x, origin.y + 5.0f }, LIGHTGRAY);
 
             if (i % labelEvery == 0)
-                coordinate::DrawTickLabel(myFont, -i, { x, origin.y + 8.0f }, 16.0f, LIGHTGRAY);
+                Coordinate::DrawTickLabel(myFont, -i, { x, origin.y + 8.0f }, 16.0f, LIGHTGRAY);
         }
 
         // Positive Y Ticks & Labels (up on screen)
@@ -316,10 +362,17 @@ int main(int argc, char* argv[])
                 DrawTextEx(myFont, text, { origin.x + 10.0f, y - size.y * 0.5f }, 16.0f, 1.0f, LIGHTGRAY);
             }
         }
+        
+        // Here we draw the arrow
+        if (arrowDragging)
+        {
+            Arrow::DrawArrow(start, GetMousePosition(), 2.0f, 20.0f, RED);
+        }
 
+        
         // --- 3. UI Sliders Panel ---
         GuiSliderBar(
-            Rectangle{ 80, 40, 120, 8 },
+            Rectangle{unitSlider},
             "Unit Scale",
             TextFormat("%d px", (int)pixelsPerUnit),
             &pixelsPerUnit,
@@ -328,7 +381,7 @@ int main(int argc, char* argv[])
         );
 
         GuiSliderBar(
-            Rectangle{ 80, 65, 120, 8 },
+            Rectangle{gravitySlider},
             "Gravity",
             TextFormat("%.1f", gravity),
             &gravity,
@@ -338,7 +391,7 @@ int main(int argc, char* argv[])
 
         // Grid line thickness slider (bottom right)
         GuiSliderBar(
-            Rectangle{ screenW - 180.0f, screenH - 30.0f, 120.0f, 8.0f },
+            Rectangle{ gridSlider },
             "Grid Thickness",
             TextFormat("%.2f px", gridThickness),
             &gridThickness,

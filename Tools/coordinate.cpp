@@ -1,11 +1,11 @@
-#include "coordinate.h"
+#include "Coordinate.h"
 
-Vector2 coordinate::origin(float screenSizeX, float screenSizeY)
+Vector2 Coordinate::origin(float screenSizeX, float screenSizeY)
 {
     return { screenSizeX * 0.5f, screenSizeY * 0.5f };
 }
 
-Vector2 coordinate::middle_edge(float screenSizeX, float screenSizeY, enum positions pos)
+Vector2 Coordinate::middle_edge(float screenSizeX, float screenSizeY, enum positions pos)
 {
     switch (pos)
     {
@@ -22,7 +22,7 @@ Vector2 coordinate::middle_edge(float screenSizeX, float screenSizeY, enum posit
     }
 }
 
-Vector2 coordinate::worldToScreen(Vector2 world, Vector2 origin, float pixelsPerUnit)
+Vector2 Coordinate::worldToScreen(Vector2 world, Vector2 origin, float pixelsPerUnit)
 {
     return {
         origin.x + world.x * pixelsPerUnit,
@@ -30,7 +30,7 @@ Vector2 coordinate::worldToScreen(Vector2 world, Vector2 origin, float pixelsPer
     };
 }
 
-Vector2 coordinate::screenToWorld(Vector2 screen, Vector2 origin, float pixelsPerUnit)
+Vector2 Coordinate::screenToWorld(Vector2 screen, Vector2 origin, float pixelsPerUnit)
 {
     return {
         (screen.x - origin.x) / pixelsPerUnit,
@@ -38,7 +38,7 @@ Vector2 coordinate::screenToWorld(Vector2 screen, Vector2 origin, float pixelsPe
     };
 }
 
-void coordinate::DrawTickLabel(Font font, int value, Vector2 pos, float fontSize, Color color)
+void Coordinate::DrawTickLabel(Font font, int value, Vector2 pos, float fontSize, Color color)
 {
     const char* text = TextFormat("%d", value);
     Vector2 size = MeasureTextEx(font, text, fontSize, 1.0f);

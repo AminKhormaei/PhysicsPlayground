@@ -1,11 +1,11 @@
 #pragma once
 #include "raylib.h"
 
-class coordinate
+class Coordinate
 {
 public:
     enum class positions { left, top, right, bottom };
-    coordinate() = default;
+    Coordinate() = default;
 
     static Vector2 origin(float screenSizeX, float screenSizeY);
     static Vector2 middle_edge(float screenSizeX, float screenSizeY, positions pos);
