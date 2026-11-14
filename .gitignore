@@ -1,0 +1,54 @@
+# ---------- CMake / build output ----------
+build/
+CMake/build/
+cmake-build-*/
+out/
+bin/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+_deps/
+Testing/
+CTestTestfile.cmake
+
+# ---------- Compiled artifacts ----------
+*.exe
+*.dll
+*.lib
+*.a
+*.o
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.res
+*.idb
+
+# ---------- Web (emscripten) output ----------
+*.wasm
+*.data
+*.js.map
+
+# ---------- JetBrains Rider ----------
+.idea/
+*.iml
+*.ipr
+*.iws
+.idea_modules/
+_ReSharper*/
+*.DotSettings.user
+
+# ---------- Visual Studio / VS Code ----------
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+
+# ---------- OS junk ----------
+Thumbs.db
+Desktop.ini
+.DS_Store
