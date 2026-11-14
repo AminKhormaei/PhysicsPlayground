@@ -1,4 +1,10 @@
+#if defined(_WIN32)
 #pragma comment(lib, "dwmapi.lib")
+extern "C" {
+__declspec(dllimport) long __stdcall DwmSetWindowAttribute(
+    void *hwnd, unsigned long attr, const void *value, unsigned long size);
+}
+#endif
 
 #include "raylib.h"
 #include "coordinate.h"
@@ -6,67 +12,62 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
-// Declared manually to avoid windows.h name clashes with raylib
-// (link with: -ldwmapi  or  dwmapi.lib)
-extern "C" {
-__declspec(dllimport) long __stdcall DwmSetWindowAttribute(
-    void *hwnd, unsigned long attr, const void *value, unsigned long size);
-}
+#include <cstdlib>
+#include <cstring>
 
-
-
-int WinMain(void)
+int main(int argc, char* argv[])
 {
+    bool testScreenshot = false;
+    float customThickness = -1.0f;
+    const char* screenshotFile = "screenshot_out.png";
+
+    for (int i = 1; i < argc; i++)
+    {
+        if (strcmp(argv[i], "--test-screenshot") == 0) testScreenshot = true;
+        if (strncmp(argv[i], "--thickness=", 12) == 0) customThickness = (float)atof(argv[i] + 12);
+        if (strncmp(argv[i], "--out=", 6) == 0) screenshotFile = argv[i] + 6;
+    }
     // Window properties
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT | FLAG_WINDOW_UNDECORATED);
-    
-    
-    
+
     // Window size
     const int screenWidth = 1280;
     const int screenHeight = 720;
-    
-    // Creating origin class
-    coordinate* co = new coordinate();
-    
 
     InitWindow(screenWidth, screenHeight, "Physics Playground");
-    
-    
+
     // Make relative paths always resolve next to the executable
     ChangeDirectory(GetApplicationDirectory());
-    
+
     // Window icon
     Image icon = LoadImage("resources/app.png");
     SetWindowIcon(icon);
-    
-    
-    // Title-bar texture loaded straight from file (no shared Image)
-    Texture2D iconTex = LoadTexture("resources/app.png");
+
+    // Title-bar texture loaded directly from decoded image data
+    Texture2D iconTex = LoadTextureFromImage(icon);
+    UnloadImage(icon); // Free CPU memory now that texture is on GPU
     SetTextureFilter(iconTex, TEXTURE_FILTER_BILINEAR);
-    
-    
+
     const char* appTitle = "Physics Playground";
-    const float iconSize = 16.0f;   // icon is drawn at this size (px)
+    const float iconSize = 20.0f;   // icon is drawn at this size (px)
     const float barPad = 8.0f;      // left padding of the bar
-    
+
     // Custom font
     Font myFont = LoadFontEx(
-    "resources/fonts/BigShoulders_18pt-Regular.ttf",
-    32,
-    nullptr,
-    0
+        "resources/fonts/BigShoulders_18pt-Regular.ttf",
+        32,
+        nullptr,
+        0
     );
-    
-    // Smooth scaling, because the font is loaded at 32 but drawn at 20
+
+    // Smooth scaling, because the font is loaded at 32 but drawn at 16-20
     SetTextureFilter(myFont.texture, TEXTURE_FILTER_BILINEAR);
-    
-    
-    // GUI stayle
+
+    // GUI style
     GuiSetFont(myFont);
     GuiSetStyle(DEFAULT, TEXT_SIZE, 18);
     GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(LIGHTGRAY));
-    
+
     // Flat, transparent title-bar buttons (affects only GuiButton)
     GuiSetStyle(BUTTON, BORDER_WIDTH, 0);                                      // no border
     GuiSetStyle(BUTTON, BASE_COLOR_NORMAL,  ColorToInt(BLANK));                // no background
@@ -75,38 +76,47 @@ int WinMain(void)
     GuiSetStyle(BUTTON, TEXT_COLOR_NORMAL,  ColorToInt(LIGHTGRAY));            // icon always visible
     GuiSetStyle(BUTTON, TEXT_COLOR_FOCUSED, ColorToInt(WHITE));
     GuiSetStyle(BUTTON, TEXT_COLOR_PRESSED, ColorToInt(WHITE));
-    
-    
+
+#if defined(_WIN32)
     // DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUND = 2
     int pref = 2;
     DwmSetWindowAttribute(GetWindowHandle(), 33, &pref, sizeof(pref));
+#endif
     
+    // Background color
+    Color color = {20,20,20,0};
+
     // Framerate
     SetTargetFPS(60);
-    
-    
-    // Unit scale default
-    float pixelsPerUnit = 20.0f;
-    
+
+    // Unit scale default (pixels per physics unit)
+    float pixelsPerUnit = 25.0f;
+
     // Gravity default
     float gravity = 9.8f;
-    
-    // Labale on the ticks
+
+    // Grid line thickness default
+    float gridThickness = 0.25f;
+    if (customThickness > 0.0f) gridThickness = customThickness;
+
+    int testFrameCount = 0;
+
+    // Labels on the ticks
     const int labelEvery = 5;
-    
+
     // Height of the draggable strip at the top of the window
     const float dragBarHeight = 28.0f;
-    
+
     // Drag the windows properties
     bool dragging = false;
     Vector2 grab = { 0 };
-    
+
     // Set to true by the close button; checked by the main loop
     bool closeRequested = false;
 
     // Size of each title-bar button
     const float btnW = 32.0f;
-    
+
     // Resize settings
     const int border = 6;                  // thickness of the invisible resize zone
     const int minW = 400, minH = 300;      // minimum window size
@@ -121,11 +131,22 @@ int WinMain(void)
     Vector2 startSize = { 0 };     // window size when resize started
 
     // Main game loop
-    while (!WindowShouldClose() && !closeRequested)    // Detect window close button or ESC key
+    while (!WindowShouldClose() && !closeRequested)
     {
         // --- Window dragging (only from the top bar) ---
         Vector2 mouse = GetMousePosition();   // relative to the window
-        
+        float screenW = (float)GetScreenWidth();
+        float screenH = (float)GetScreenHeight();
+
+        // Mouse wheel zoom for pixelsPerUnit
+        float wheel = GetMouseWheelMove();
+        if (wheel != 0.0f)
+        {
+            pixelsPerUnit += wheel * 2.0f;
+            if (pixelsPerUnit < 10.0f) pixelsPerUnit = 10.0f;
+            if (pixelsPerUnit > 100.0f) pixelsPerUnit = 100.0f;
+        }
+
         // --- Window resizing (manual, since the window is undecorated) ---
         int w = GetScreenWidth();
         int h = GetScreenHeight();
@@ -142,11 +163,11 @@ int WinMain(void)
 
         // Cursor feedback
         int shown = resizing ? resizeEdge : hover;
-        if (shown == EDGE_L || shown == EDGE_R)                         SetMouseCursor(MOUSE_CURSOR_RESIZE_EW);
-        else if (shown == EDGE_T || shown == EDGE_B)                    SetMouseCursor(MOUSE_CURSOR_RESIZE_NS);
-        else if (shown == (EDGE_L | EDGE_T) || shown == (EDGE_R | EDGE_B)) SetMouseCursor(MOUSE_CURSOR_RESIZE_NWSE);
-        else if (shown == (EDGE_R | EDGE_T) || shown == (EDGE_L | EDGE_B)) SetMouseCursor(MOUSE_CURSOR_RESIZE_NESW);
-        else                                                            SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+        if (shown == EDGE_L || shown == EDGE_R)                             SetMouseCursor(MOUSE_CURSOR_RESIZE_EW);
+        else if (shown == EDGE_T || shown == EDGE_B)                        SetMouseCursor(MOUSE_CURSOR_RESIZE_NS);
+        else if (shown == (EDGE_L | EDGE_T) || shown == (EDGE_R | EDGE_B))  SetMouseCursor(MOUSE_CURSOR_RESIZE_NWSE);
+        else if (shown == (EDGE_R | EDGE_T) || shown == (EDGE_L | EDGE_B))  SetMouseCursor(MOUSE_CURSOR_RESIZE_NESW);
+        else                                                                SetMouseCursor(MOUSE_CURSOR_DEFAULT);
 
         // Start resizing
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hover != 0)
@@ -187,9 +208,9 @@ int WinMain(void)
             SetWindowPosition((int)nx, (int)ny);
             SetWindowSize((int)nw, (int)nh);
         }
-        
+
         // Buttons occupy the right-most 3 * btnW pixels of the bar
-        float buttonsX = GetScreenWidth() - 3 * btnW;
+        float buttonsX = screenW - 3 * btnW;
 
         // Start dragging only if the click started inside the top bar
         // (and not on the buttons, and not while maximized)
@@ -211,143 +232,170 @@ int WinMain(void)
             SetWindowPosition((int)(win.x + mouse.x - grab.x),
                               (int)(win.y + mouse.y - grab.y));
         }
-        
-        
-        // Get the origin of the screen each frame
-        Vector2 origin = co->origin(GetScreenWidth(), GetScreenHeight());
-        
-        // Middle of the edge of the screen
-        Vector2 left = co->middle_edge(GetScreenWidth(), GetScreenHeight(), coordinate::positions::left);
-        Vector2 right = co->middle_edge(GetScreenWidth(), GetScreenHeight(), coordinate::positions::right);
-        Vector2 top = co->middle_edge(GetScreenWidth(), GetScreenHeight(), coordinate::positions::top);
-        Vector2 bottom = co->middle_edge(GetScreenWidth(), GetScreenHeight(), coordinate::positions::bottom);
-        
+
+        // Coordinate calculations
+        Vector2 origin = coordinate::origin(screenW, screenH);
+        Vector2 left = coordinate::middle_edge(screenW, screenH, coordinate::positions::left);
+        Vector2 right = coordinate::middle_edge(screenW, screenH, coordinate::positions::right);
+        Vector2 top = coordinate::middle_edge(screenW, screenH, coordinate::positions::top);
+        Vector2 bottom = coordinate::middle_edge(screenW, screenH, coordinate::positions::bottom);
+
+        float step = pixelsPerUnit;
 
         BeginDrawing();
 
-        ClearBackground(DARKGRAY);
-        
+        ClearBackground(color);
 
-        
-        // --- Title bar buttons (top right) ---
-        float bx = GetScreenWidth() - 3 * btnW;
+        // --- 1. Background Grid Lines (Subtle Cartesian Grid) ---
+        Color gridColor = Fade(LIGHTGRAY, 0.3f);
 
-        // Minimize
-        if (GuiButton(Rectangle{ bx, 0, btnW, dragBarHeight }, "-"))
-            MinimizeWindow();
+        // Vertical grid lines
+        for (float x = origin.x + step; x <= right.x; x += step)
+            DrawLineEx({ x, top.y }, { x, bottom.y }, gridThickness, gridColor);
+        for (float x = origin.x - step; x >= left.x; x -= step)
+            DrawLineEx({ x, top.y }, { x, bottom.y }, gridThickness, gridColor);
 
-        // Maximize / Restore
-        if (GuiButton(Rectangle{ bx + btnW, 0, btnW, dragBarHeight }, "[]"))
+        // Horizontal grid lines
+        for (float y = origin.y - step; y >= top.y; y -= step)
+            DrawLineEx({ left.x, y }, { right.x, y }, gridThickness, gridColor);
+        for (float y = origin.y + step; y <= bottom.y; y += step)
+            DrawLineEx({ left.x, y }, { right.x, y }, gridThickness, gridColor);
+
+        // --- 2. Main Coordinate Axes ---
+        DrawLineV(left, right, LIGHTGRAY);
+        DrawLineV(bottom, top, LIGHTGRAY);
+
+        // Origin Point & Label
+        DrawCircleV(origin, 4.0f, LIGHTGRAY);
+        DrawTextEx(myFont, "ORIGIN (0, 0)", { origin.x + 10.0f, origin.y + 6.0f }, 16.0f, 1.0f, LIGHTGRAY);
+
+        // Positive X Ticks & Labels
+        for (int i = 1; origin.x + i * step <= right.x; i++)
         {
-            if (IsWindowMaximized()) RestoreWindow();
-            else MaximizeWindow();
+            float x = origin.x + i * step;
+            DrawLineV({ x, origin.y - 5.0f }, { x, origin.y + 5.0f }, LIGHTGRAY);
+
+            if (i % labelEvery == 0)
+                coordinate::DrawTickLabel(myFont, i, { x, origin.y + 8.0f }, 16.0f, LIGHTGRAY);
         }
 
-        // Close
-        if (GuiButton(Rectangle{ bx + 2 * btnW, 0, btnW, dragBarHeight }, "X"))
-            closeRequested = true;
+        // Negative X Ticks & Labels
+        for (int i = 1; origin.x - i * step >= left.x; i++)
+        {
+            float x = origin.x - i * step;
+            DrawLineV({ x, origin.y - 5.0f }, { x, origin.y + 5.0f }, LIGHTGRAY);
 
-        // Origin & Text
-        DrawCircle(origin.x, origin.y, 4, LIGHTGRAY); // Origin point
-        GuiLabel(Rectangle{origin.x + 10,origin.y + 5, 120, 30}, "ORIGIN");
-        
-        // Division amount slider
+            if (i % labelEvery == 0)
+                coordinate::DrawTickLabel(myFont, -i, { x, origin.y + 8.0f }, 16.0f, LIGHTGRAY);
+        }
+
+        // Positive Y Ticks & Labels (up on screen)
+        for (int i = 1; origin.y - i * step >= top.y; i++)
+        {
+            float y = origin.y - i * step;
+            DrawLineV({ origin.x - 5.0f, y }, { origin.x + 5.0f, y }, LIGHTGRAY);
+
+            if (i % labelEvery == 0)
+            {
+                const char* text = TextFormat("%d", i);
+                Vector2 size = MeasureTextEx(myFont, text, 16.0f, 1.0f);
+                DrawTextEx(myFont, text, { origin.x + 10.0f, y - size.y * 0.5f }, 16.0f, 1.0f, LIGHTGRAY);
+            }
+        }
+
+        // Negative Y Ticks & Labels (down on screen)
+        for (int i = 1; origin.y + i * step <= bottom.y; i++)
+        {
+            float y = origin.y + i * step;
+            DrawLineV({ origin.x - 5.0f, y }, { origin.x + 5.0f, y }, LIGHTGRAY);
+
+            if (i % labelEvery == 0)
+            {
+                const char* text = TextFormat("%d", -i);
+                Vector2 size = MeasureTextEx(myFont, text, 16.0f, 1.0f);
+                DrawTextEx(myFont, text, { origin.x + 10.0f, y - size.y * 0.5f }, 16.0f, 1.0f, LIGHTGRAY);
+            }
+        }
+
+        // --- 3. UI Sliders Panel ---
         GuiSliderBar(
-            Rectangle{ 80, 40, 100, 10 },
+            Rectangle{ 80, 40, 120, 8 },
             "Unit Scale",
             TextFormat("%d px", (int)pixelsPerUnit),
             &pixelsPerUnit,
-            20,
-            30
+            10.0f,
+            100.0f
         );
-        
-        // gravity amount slider
+
         GuiSliderBar(
-            Rectangle{ 80, 60, 100, 10 },
+            Rectangle{ 80, 65, 120, 8 },
             "Gravity",
             TextFormat("%.1f", gravity),
             &gravity,
             0.0f,
             20.0f
         );
-        
-        float step = pixelsPerUnit;
-        
-        // Coordinate lines
-        DrawLine(left.x, left.y, right.x, right.y, LIGHTGRAY);
-        
-        // Positive X
-        for (int i = 1; origin.x + i * step <= right.x; i++)
-        {
-            float x = origin.x + i * step;
-            DrawLineV({x, origin.y - 5}, {x, origin.y + 5}, LIGHTGRAY);
 
-            if (i % labelEvery == 0)
-                co->DrawTickLabel(myFont, i, {x, origin.y + 8}, 16, LIGHTGRAY);
-        }
-
-        // Negative X
-        for (int i = 1; origin.x - i * step >= left.x; i++)
-        {
-            float x = origin.x - i * step;
-            DrawLineV({x, origin.y - 5}, {x, origin.y + 5}, LIGHTGRAY);
-
-            if (i % labelEvery == 0)
-                co->DrawTickLabel(myFont, -i, {x, origin.y + 8}, 16, LIGHTGRAY);
-        }
-
-
-        
-        
-        DrawLine(bottom.x, bottom.y, top.x, top.y, LIGHTGRAY);
-        
-        // Positive Y (up on screen)
-        for (int i = 1; origin.y - i * step >= top.y; i++)
-        {
-            float y = origin.y - i * step;
-            DrawLineV({origin.x - 5, y}, {origin.x + 5, y}, LIGHTGRAY);
-
-            if (i % labelEvery == 0)
-                DrawTextEx(myFont, TextFormat("%d", i), {origin.x + 10, y - 8}, 16, 1, LIGHTGRAY);
-        }
-
-        // Negative Y (down on screen)
-        for (int i = 1; origin.y + i * step <= bottom.y; i++)
-        {
-            float y = origin.y + i * step;
-            DrawLineV({origin.x - 5, y}, {origin.x + 5, y}, LIGHTGRAY);
-
-            if (i % labelEvery == 0)
-                DrawTextEx(myFont, TextFormat("%d", -i), {origin.x + 10, y - 8}, 16, 1, LIGHTGRAY);
-        }
-        
-        // Visual hint for the drag area
-        DrawRectangle(0, 0, GetScreenWidth(), (int)dragBarHeight, Fade(BLACK, 0.5f));
-        
-        // --- Title bar: icon + name (top left) ---
-        float iconY = (dragBarHeight - iconSize) * 0.5f;
-
-        DrawTexturePro(
-            iconTex,
-            Rectangle{ 0, 0, (float)iconTex.width, (float)iconTex.height },   // source: whole image
-            Rectangle{ barPad, iconY, iconSize, iconSize },                   // destination: scaled
-            Vector2{ 0, 0 }, 0.0f, WHITE
+        // Grid line thickness slider (bottom right)
+        GuiSliderBar(
+            Rectangle{ screenW - 180.0f, screenH - 30.0f, 120.0f, 8.0f },
+            "Grid Thickness",
+            TextFormat("%.2f px", gridThickness),
+            &gridThickness,
+            0.25f,
+            0.5f
         );
 
-        // Vertically center the text inside the bar
-        float fontSize = 16.0f;
+        // --- 4. Title Bar (Rendered on top of background) ---
+        // Top draggable bar background
+        DrawRectangle(0, 0, (int)screenW, (int)dragBarHeight, Fade(BLACK, 0.55f));
+
+        // Icon + Title (top left)
+        float iconY = (dragBarHeight - iconSize) * 0.5f;
+        DrawTexturePro(
+            iconTex,
+            Rectangle{ 0.0f, 0.0f, (float)iconTex.width, (float)iconTex.height },
+            Rectangle{ barPad, iconY, iconSize, iconSize },
+            Vector2{ 0.0f, 0.0f }, 0.0f, WHITE
+        );
+
+        float fontSize = 18.0f;
         DrawTextEx(myFont, appTitle,
                    Vector2{ barPad + iconSize + 8.0f, (dragBarHeight - fontSize) * 0.5f },
-                   fontSize, 1, LIGHTGRAY);
-        
+                   fontSize, 1.0f, ORANGE);
+
+        // Title Bar Window Control Buttons (top right)
+        float bx = screenW - 3 * btnW;
+
+        if (GuiButton(Rectangle{ bx, 0, btnW, dragBarHeight }, "-"))
+            MinimizeWindow();
+
+        if (GuiButton(Rectangle{ bx + btnW, 0, btnW, dragBarHeight }, "[]"))
+        {
+            if (IsWindowMaximized()) RestoreWindow();
+            else MaximizeWindow();
+        }
+
+        if (GuiButton(Rectangle{ bx + 2 * btnW, 0, btnW, dragBarHeight }, "X"))
+            closeRequested = true;
 
         EndDrawing();
 
+        if (testScreenshot)
+        {
+            testFrameCount++;
+            if (testFrameCount >= 5)
+            {
+                TakeScreenshot(screenshotFile);
+                break;
+            }
+        }
     }
-    UnloadImage(icon);
+
+    // Cleanup resources
     UnloadTexture(iconTex);
     UnloadFont(myFont);
-    CloseWindow();        // Close window and OpenGL context
-    
+    CloseWindow();
+
     return 0;
 }

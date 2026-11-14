@@ -3,13 +3,14 @@
 
 class coordinate
 {
-    public:
-        enum class positions { left, top, right, bottom };
-        coordinate() = default; // default constructor
-    
-        Vector2 origin(float, float);   // Finding the center of the screen 
-        Vector2 middle_edge(int, int, positions); // Coordinate of the left, top, right, bottom
-        Vector2 worldToScreen(Vector2, Vector2, float);
-        Vector2 screenToWorld(Vector2, Vector2, float);
-        void DrawTickLabel(Font, int, Vector2, float, Color);
+public:
+    enum class positions { left, top, right, bottom };
+    coordinate() = default;
+
+    static Vector2 origin(float screenSizeX, float screenSizeY);
+    static Vector2 middle_edge(float screenSizeX, float screenSizeY, positions pos);
+    static Vector2 worldToScreen(Vector2 world, Vector2 origin, float pixelsPerUnit);
+    static Vector2 screenToWorld(Vector2 screen, Vector2 origin, float pixelsPerUnit);
+    static void DrawTickLabel(Font font, int value, Vector2 pos, float fontSize, Color color);
 };
+

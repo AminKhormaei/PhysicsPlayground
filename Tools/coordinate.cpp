@@ -2,34 +2,23 @@
 
 Vector2 coordinate::origin(float screenSizeX, float screenSizeY)
 {
-    float xCoordinate, yCoordinate;
-    xCoordinate = screenSizeX / 2.0f;
-    yCoordinate = screenSizeY / 2.0f;
-    
-    return {
-    xCoordinate, yCoordinate
-    };
+    return { screenSizeX * 0.5f, screenSizeY * 0.5f };
 }
 
-Vector2 coordinate::middle_edge(int screenSizeX, int screenSizeY, enum positions positions)
+Vector2 coordinate::middle_edge(float screenSizeX, float screenSizeY, enum positions pos)
 {
-    switch (positions)
+    switch (pos)
     {
         case positions::left:
-            return { 0, screenSizeY / 2.0f };
-            break;
-        
+            return { 0.0f, screenSizeY * 0.5f };
         case positions::right:
-            return {(float)screenSizeX, screenSizeY / 2.0f};
-            break;
-        
+            return { screenSizeX, screenSizeY * 0.5f };
         case positions::top:
-            return {screenSizeX / 2.0f, 0};
-            break;
-        
+            return { screenSizeX * 0.5f, 0.0f };
         case positions::bottom:
-            return {screenSizeX / 2.0f, (float)screenSizeY};
-            break;
+            return { screenSizeX * 0.5f, screenSizeY };
+        default:
+            return { 0.0f, 0.0f };
     }
 }
 
@@ -52,6 +41,6 @@ Vector2 coordinate::screenToWorld(Vector2 screen, Vector2 origin, float pixelsPe
 void coordinate::DrawTickLabel(Font font, int value, Vector2 pos, float fontSize, Color color)
 {
     const char* text = TextFormat("%d", value);
-    Vector2 size = MeasureTextEx(font, text, fontSize, 1);
-    DrawTextEx(font, text, { pos.x - size.x / 2, pos.y }, fontSize, 1, color);
+    Vector2 size = MeasureTextEx(font, text, fontSize, 1.0f);
+    DrawTextEx(font, text, { pos.x - size.x * 0.5f, pos.y }, fontSize, 1.0f, color);
 }
