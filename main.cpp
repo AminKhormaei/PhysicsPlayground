@@ -446,7 +446,7 @@ int main(int argc, char* argv[])
             closeRequested = true;
         
         /*---------------------------------------------- TEST*/
-        DrawTextEx(myFont, TextFormat("%.2f , %.2f, %.2f", result.x, result.y, result.z),{30, 100}, 20 , 0, RED);
+        DrawTextEx(myFont, TextFormat("%.2f , %.2f, %.2f"),{30, 100}, 20 , 0, RED);
         /*---------------------------------------------- TEST*/
 
         EndDrawing();
