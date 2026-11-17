@@ -36,7 +36,19 @@ FetchContent_Declare(
         GIT_SHALLOW TRUE
 )
 
+# Download PhysicsTools
+FetchContent_Declare(
+        PhysicsTools
+        GIT_REPOSITORY https://github.com/AminKhormaei/PhysicsTools.git
+        GIT_TAG main   # better: a version tag like v1.0.0
+        GIT_PROGRESS TRUE
+)
+
+# Use my local clone instead of downloading from GitHub
+set(FETCHCONTENT_SOURCE_DIR_PHYSICSTOOLS "E:/PhysicsTools")
+
 FetchContent_MakeAvailable(raygui)
+FetchContent_MakeAvailable(PhysicsTools)
 
 # Project sources
 file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
@@ -91,6 +103,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 # Link libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE
         raylib
+)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE
+        PhysicsTools::PhysicsTools
 )
 
 # Web Configurations

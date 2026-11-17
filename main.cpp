@@ -1,3 +1,4 @@
+#include "PhysicsTools/VecLength.h"
 #if defined(_WIN32)
 #pragma comment(lib, "dwmapi.lib")
 extern "C" {
@@ -6,9 +7,9 @@ __declspec(dllimport) long __stdcall DwmSetWindowAttribute(
 }
 #endif
 
-#include "raylib.h"
-#include "Coordinate.h"
 #include "Arrow.h"
+#include "Coordinate.h"
+#include "raylib.h"
 
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
@@ -16,6 +17,8 @@ __declspec(dllimport) long __stdcall DwmSetWindowAttribute(
 
 #include <cstdlib>
 #include <cstring>
+
+#include "PhysicsTools/PhysicsTools.h"
 
 int main(int argc, char* argv[])
 {
@@ -135,6 +138,14 @@ int main(int argc, char* argv[])
     // Arrow stuff
     Vector2 start = { 0 };
     bool arrowDragging = false;
+    
+    
+    /*---------------------------------------------------------------- TEST*/
+    Vec3D vec = {7,15,8};
+    Vec3D vec2 = {1,2,3};
+    Vec3D result = Cross(vec, vec2);
+    /*---------------------------------------------------------------- TEST*/
+    
 
     // Main game loop
     while (!WindowShouldClose() && !closeRequested)
@@ -290,6 +301,8 @@ int main(int argc, char* argv[])
 
         BeginDrawing();
         
+        
+        
         ClearBackground(color);
 
         // --- 1. Background Grid Lines (Subtle Cartesian Grid) ---
@@ -431,6 +444,10 @@ int main(int argc, char* argv[])
 
         if (GuiButton(Rectangle{ bx + 2 * btnW, 0, btnW, dragBarHeight }, "X"))
             closeRequested = true;
+        
+        /*---------------------------------------------- TEST*/
+        DrawTextEx(myFont, TextFormat("%.2f , %.2f, %.2f", result.x, result.y, result.z),{30, 100}, 20 , 0, RED);
+        /*---------------------------------------------- TEST*/
 
         EndDrawing();
 
