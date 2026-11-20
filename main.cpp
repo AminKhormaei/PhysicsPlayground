@@ -268,14 +268,20 @@ int main(int argc, char* argv[])
         float step = pixelsPerUnit;
         
         // ---------------------------------------------------------------------------- TEST
-        float dt = GetFrameTime();
-        Vec2D SpawnPos = {0.0f, 0.0f};
-        particleSystem.SetEmitter(MakeProjectile2D(SpawnPos, {RandomRange(1.0f,15.0f) ,RandomRange(5.0, 1.0)}, RandomRange(3.0f,7.0f)), spawnRate);
+        Vec2D SpawnPos = {
+            (mouse.x - origin.x) / pixelsPerUnit,
+            (origin.y - mouse.y) / pixelsPerUnit
+        };
+        
         particleSystem.SetGravity(gravity);
+        particleSystem.SetEmitter(MakeProjectile2D(SpawnPos, {RandomRange(-5.0f,5.0f) ,RandomRange(5.0, 10.0f)}, RandomRange(1.0f,2.0f)), spawnRate);
+        float dt = GetFrameTime();
         particleSystem.Update(dt);
         // ---------------------------------------------------------------------------- TEST
 
         BeginDrawing();
+        
+        ClearBackground(color);
         
         // ---------------------------------------------------------------------------- TEST
         for (const auto& p : particleSystem.GetAll())
@@ -288,7 +294,7 @@ int main(int argc, char* argv[])
         }
         // ---------------------------------------------------------------------------- TEST
         
-        ClearBackground(color);
+
 
         // --- 1. Background Grid Lines (Subtle Cartesian Grid) ---
         Color gridColor = Fade(LIGHTGRAY, 0.3f);
