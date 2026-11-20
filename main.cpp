@@ -1,4 +1,5 @@
-#include "PhysicsTools/VecLength.h"
+#include "PhysicsTools/ParticleSystem.h"
+#include "PhysicsTools/Projectile.h"
 #if defined(_WIN32)
 #pragma comment(lib, "dwmapi.lib")
 extern "C" {
@@ -7,7 +8,6 @@ __declspec(dllimport) long __stdcall DwmSetWindowAttribute(
 }
 #endif
 
-#include "Arrow.h"
 #include "Coordinate.h"
 #include "raylib.h"
 
@@ -22,6 +22,8 @@ __declspec(dllimport) long __stdcall DwmSetWindowAttribute(
 
 int main(int argc, char* argv[])
 {
+    
+    
     bool testScreenshot = false;
     float customThickness = -1.0f;
     const char* screenshotFile = "screenshot_out.png";
@@ -40,6 +42,8 @@ int main(int argc, char* argv[])
     const int screenHeight = 720;
 
     InitWindow(screenWidth, screenHeight, "Physics Playground");
+    
+    
 
     // Make relative paths always resolve next to the executable
     ChangeDirectory(GetApplicationDirectory());
@@ -93,9 +97,10 @@ int main(int argc, char* argv[])
 
     // Framerate
     SetTargetFPS(60);
+    
 
     // Unit scale default (pixels per physics unit)
-    float pixelsPerUnit = 25.0f;
+    float pixelsPerUnit = 55.0f;
 
     // Gravity default
     float gravity = 9.8f;
@@ -135,15 +140,10 @@ int main(int argc, char* argv[])
     Vector2 startPos = { 0 };      // window position when resize started
     Vector2 startSize = { 0 };     // window size when resize started
     
-    // Arrow stuff
-    Vector2 start = { 0 };
-    bool arrowDragging = false;
-    
     
     /*---------------------------------------------------------------- TEST*/
-    Vec3D vec = {7,15,8};
-    Vec3D vec2 = {1,2,3};
-    Vec3D result = Cross(vec, vec2);
+    ParticleSystem2D particleSystem;
+    float spawnRate = 60.0f; // particles per second
     /*---------------------------------------------------------------- TEST*/
     
 
@@ -160,23 +160,6 @@ int main(int argc, char* argv[])
         Rectangle unitSlider    = { 80, 40, 120, 8 };
         Rectangle gravitySlider = { 80, 65, 120, 8 };
         Rectangle gridSlider    = { screenW - 180.0f, screenH - 30.0f, 120.0f, 8.0f };
-        
-        // Returns true if point p is on top of any UI element
-        auto OverUI = [&](Vector2 p)
-        {
-            // Inflate a rect so the label, the value text and the thin 8px bar are all easy to hit
-            auto hit = [&](Rectangle r)
-            {
-                r.x -= 70; r.width  += 140;
-                r.y -= 8;  r.height += 16;
-                return CheckCollisionPointRec(p, r);
-            };
-
-            return p.y <= dragBarHeight // title bar (drag area + buttons)
-                || hit(unitSlider)
-                || hit(gravitySlider)
-                || hit(gridSlider);
-        };
 
         
         // Mouse wheel zoom for pixelsPerUnit
@@ -274,21 +257,6 @@ int main(int argc, char* argv[])
                               (int)(win.y + mouse.y - grab.y));
         }
         
-        // Mouse pressed: remember where the arrow starts
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)
-                    && hover == 0
-                    && !dragging
-                    && !OverUI(mouse))
-        {
-            start = mouse;
-            arrowDragging = true;
-        }
-
-        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
-        {
-            arrowDragging = false;
-        }
-        
         
         // Coordinate calculations
         Vector2 origin = Coordinate::origin(screenW, screenH);
@@ -298,10 +266,27 @@ int main(int argc, char* argv[])
         Vector2 bottom = Coordinate::middle_edge(screenW, screenH, Coordinate::positions::bottom);
 
         float step = pixelsPerUnit;
+        
+        // ---------------------------------------------------------------------------- TEST
+        float dt = GetFrameTime();
+        Vec2D SpawnPos = {0.0f, 0.0f};
+        particleSystem.SetEmitter(MakeProjectile2D(SpawnPos, {RandomRange(1.0f,15.0f) ,RandomRange(5.0, 1.0)}, RandomRange(3.0f,7.0f)), spawnRate);
+        particleSystem.SetGravity(gravity);
+        particleSystem.Update(dt);
+        // ---------------------------------------------------------------------------- TEST
 
         BeginDrawing();
         
-        
+        // ---------------------------------------------------------------------------- TEST
+        for (const auto& p : particleSystem.GetAll())
+        {
+            float screenX = origin.x + p.position.x * pixelsPerUnit;
+            float screenY = origin.y - p.position.y * pixelsPerUnit;
+            float t = p.NormalizedAge();
+            float radius = 4.0f * (1.0f - t);
+            DrawCircleV({ screenX, screenY }, radius, RED);
+        }
+        // ---------------------------------------------------------------------------- TEST
         
         ClearBackground(color);
 
@@ -375,12 +360,6 @@ int main(int argc, char* argv[])
                 DrawTextEx(myFont, text, { origin.x + 10.0f, y - size.y * 0.5f }, 16.0f, 1.0f, LIGHTGRAY);
             }
         }
-        
-        // Here we draw the arrow
-        if (arrowDragging)
-        {
-            Arrow::DrawArrow(start, GetMousePosition(), 2.0f, 20.0f, RED);
-        }
 
         
         // --- 3. UI Sliders Panel ---
@@ -446,8 +425,9 @@ int main(int argc, char* argv[])
             closeRequested = true;
         
         /*---------------------------------------------- TEST*/
-        DrawTextEx(myFont, TextFormat("%.2f , %.2f, %.2f"),{30, 100}, 20 , 0, RED);
+
         /*---------------------------------------------- TEST*/
+        
 
         EndDrawing();
 
